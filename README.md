@@ -51,13 +51,12 @@ Aplikasi menggunakan **Role-Based Access Control (RBAC)** dengan prinsip:
 COO  (God Mode — akses menyeluruh)
 │
 ├── SALES
-│   ├── Kelola akun: Forwarder, Gudang, Kurir, Ekspedisi, Driver, PIC Sales
-│   └── Dashboard: monitor unit CBU 1–3 & 10–16 / CKD 1–3 & 10–14
+│   ├── Kelola akun: Forwarder, Gudang, KEUR, Ekspedisi, Driver, PIC Sales
+│   └── Dashboard: monitor unit CBU 1–3 & 10–14 / CKD 1–3 & 10–13
 │       ├── Forwarder        → CBU State 1, 2, 3
-│       ├── Gudang           → CBU State 10, 13 / CKD State 10, 13
-│       ├── Kurir            → CBU State 11 / CKD State 11
-│       ├── LOLO Ker (ker)   → CBU State 12 / CKD State 12
-│       └── Ekspedisi/Driver → CBU State 14, 15 / CKD State 14
+│       ├── Gudang           → CBU State 10, 12 / CKD State 10, 12
+│       ├── KEUR (keur)      → CBU State 11 / CKD State 11
+│       └── Ekspedisi/Driver → CBU State 13, 14 / CKD State 13
 │
 └── AFTER SALES HEAD (as_head) — "Mini COO" khusus After Sales
     ├── Import unit Excel
@@ -71,7 +70,7 @@ COO  (God Mode — akses menyeluruh)
     │       └── Foreman  → State 9 (QC/PDI)
     │
     └── AS TECHNICAL (as_technical)
-        └── Handle semua trouble CBU State 1–15 / CKD State 1–14
+        └── Handle semua trouble CBU State 1–14 / CKD State 1–13
 ```
 
 ### 3.3 Tabel Hak Akses per Role
@@ -79,17 +78,16 @@ COO  (God Mode — akses menyeluruh)
 | Role | Dashboard | Kelola Akun | Hak Istimewa |
 |------|-----------|-------------|---------------|
 | `coo` | Semua (Sales + After Sales + Field Team) | `sales`, `as_head` | God Mode penuh, Import/Export |
-| `sales` | CBU 1–3 & 10–15 / CKD 1–3 & 10–14 | `forwarder`, `gudang`, `kurir`, `ker`, `ekspedisi`, `driver`, PIC Sales | — |
+| `sales` | CBU 1–3 & 10–14 / CKD 1–3 & 10–13 | `forwarder`, `gudang`, `keur`, `ekspedisi`, `driver`, PIC Sales | — |
 | `as_head` | Semua dashboard After Sales | `as_workshop`, `as_technical`, `karoseri`, `foreman` | Import unit, handle trouble, God Mode scope AS |
 | `as_workshop` | State 4–9 (Workshop Operation) | `karoseri`, `foreman` | Generate link mobile |
 | `as_technical` | Trouble semua state | — | Handle trouble |
 | `forwarder` | — | — | CBU: State 1, 2, 3 |
 | `karoseri` | — | — | CBU & CKD: State 4, 5, 6, 7, 8 (milestone 0%→100%) |
 | `foreman` | — | — | CBU & CKD: State 9 (PDI) |
-| `gudang` | — | — | CBU: State 10, 13 / CKD: State 10, 13 |
-| `kurir` | — | — | CBU: State 11 / CKD: State 11 (Kurir masuk gudang) |
-| `ker` | — | — | CBU: State 12 / CKD: State 12 (Verifikasi LOLO Ker) |
-| `ekspedisi` / `driver` | — | — | CBU: State 14, 15 / CKD: State 14 |
+| `gudang` | — | — | CBU: State 10, 12 / CKD: State 10, 12 |
+| `keur` | — | — | CBU: State 11 / CKD: State 11 (Uji sertifikasi — Lolos/Tidak Lolos) |
+| `ekspedisi` / `driver` | — | — | CBU: State 13, 14 / CKD: State 13 |
 | `na` | — | — | CKD: State 0, 1 |
 | `dealer` | — | — | CKD: State 2, 3 |
 
@@ -156,7 +154,7 @@ Link ini di-generate oleh Sales (untuk field team mereka) atau After Sales (untu
 ```mermaid
 flowchart TD
     %% =================== AKTOR ===================
-    FT(["👷 Field Team\n─────────────────\nForwarder\nKaroseri\nForeman\nGudang\nKurir\nKer (LOLO Ker)\nEkspedisi / Driver\nNA / Dealer"])
+    FT(["👷 Field Team\n─────────────────\nForwarder\nKaroseri\nForeman\nGudang\nKEUR (Petugas Uji)\nEkspedisi / Driver\nNA / Dealer"])
     SALES(["🔵 Sales"])
     AS(["🟣 After Sales"])
     COO(["🔴 COO\n(God Mode)"])
@@ -175,9 +173,9 @@ flowchart TD
     end
 
     subgraph UC_SALES ["🔵 Sales Dashboard"]
-        S_DASH["Pantau Unit\nCBU: State 1–3 & 10–15\nCKD: State 1–3 & 10–14"]
+        S_DASH["Pantau Unit\nCBU: State 1–3 & 10–14\nCKD: State 1–3 & 10–13"]
         S_KPI["Lihat KPI & Progress\nPhase 1 dan Phase 4"]
-        S_ACC["Kelola Akun\nForwarder, Gudang, Kurir, Ker\nEkspedisi, Driver, PIC Sales"]
+        S_ACC["Kelola Akun\nForwarder, Gudang, KEUR\nEkspedisi, Driver, PIC Sales"]
         S_LINK["Generate Link Mobile\nUntuk Field Team"]
         S_EXPORT["Export Excel BAST\n(Filter Tanggal, Tipe, Karoseri)"]
     end
@@ -195,7 +193,7 @@ flowchart TD
             A_LINK["Generate Link Mobile\nUntuk Field Team"]
         end
         subgraph UC_AS_TECH ["B — as_technical: Technical (HO)"]
-            T_RESP["Beri Instruksi / ho_response\n(Semua Trouble CBU 1–15\n/ CKD 1–14)"]
+            T_RESP["Beri Instruksi / ho_response\n(Semua Trouble CBU 1–14\n/ CKD 1–13)"]
             T_SOLVE["Tandai Trouble Selesai\n+ Isi Solusi"]
         end
     end
@@ -255,14 +253,14 @@ flowchart TD
 
 ## 6. Alur Progres Unit (State Pipeline)
 
-### 6.1 Alur CBU (Completely Built-Up) — 16 States (State 0–15)
+### 6.1 Alur CBU (Completely Built-Up) — 15 States (State 0–14)
 
 Setiap update state dilakukan dengan **Scan SIN** (Stiker Identifikasi Kendaraan yang ditempel saat unit tiba di Priok).
 
 ```
-State 0 → 1 → 2 → 3 → [4→5→6→7→8→9] → 10  → 11  → 12       → 13 → 14  → 15
-  Priok   Forwarder    ←── After Sales ──→  Gudang  Kurir  LOLO Ker  Gudang  Ekspedisi SELESAI
-          (Sales)      Karoseri 0-100% PDI  Masuk          Verif.  Keluar
+State 0 → 1 → 2 → 3 → [4→5→6→7→8→9] → 10  → 11   → 12 → 13  → 14
+  Priok   Forwarder    ←── After Sales ──→  Gudang  KEUR  Gudang  Ekspedisi  SELESAI
+          (Sales)      Karoseri 0-100% PDI  Masuk   Uji   Keluar
 ```
 
 | State | Nama | Role | Foto Wajib | Keterangan | Dashboard |
@@ -278,11 +276,10 @@ State 0 → 1 → 2 → 3 → [4→5→6→7→8→9] → 10  → 11  → 12    
 | 8 | Karoseri 100% | `karoseri` | ✅ | Finishing & wiring (lampu, sensor parkir) | After Sales |
 | 9 | QC / PDI | `foreman` | ✅ | Lihat PDI Fork | After Sales |
 | 10 | Gudang Masuk | `gudang` | ✅ | Konfirmasi unit masuk gudang | Sales |
-| 11 | Kurir | `kurir` | ✅ | Kurir mencatat penerimaan unit di gudang | Sales |
-| 12 | Verifikasi LOLO Ker | `ker` | ✅ | Lolos / Tidak Lolos — wajib sebelum keluar | Sales |
-| 13 | Gudang Keluar | `gudang` | ✅ | Konfirmasi unit keluar gudang | Sales |
-| 14 | Keluar ke Customer | `ekspedisi`, `driver` | ✅ | Perjalanan ke customer | Sales |
-| 15 | SELESAI | `ekspedisi`, `driver` | ✅ + Alamat + BAST | Foto BAST + Alamat lengkap | Sales |
+| 11 | KEUR | `keur` | ✅ | Uji sertifikasi kendaraan — **Lolos / Tidak Lolos** | Sales |
+| 12 | Gudang Keluar | `gudang` | ✅ | Konfirmasi unit keluar gudang | Sales |
+| 13 | Keluar ke Customer | `ekspedisi`, `driver` | ✅ | Perjalanan ke customer | Sales |
+| 14 | SELESAI | `ekspedisi`, `driver` | ✅ + Alamat + BAST | Foto BAST + Alamat lengkap | Sales |
 
 **Catatan State 0 (Di Priok):**
 Sebelum State 1, unit sudah ada di sistem (diimport via Excel) tapi belum dikonfirmasi keluar. Aktivitas di Priok:
@@ -290,15 +287,15 @@ Sebelum State 1, unit sudah ada di sistem (diimport via Excel) tapi belum dikonf
 - General Inspection (GI)
 - Penempelan Stiker SIN (Stiker Identifikasi Kendaraan)
 
-### 6.2 Alur CKD (Completely Knocked-Down) — 15 States (State 0–14)
+### 6.2 Alur CKD (Completely Knocked-Down) — 14 States (State 0–13)
 
 ```
-State 0 → 1 → 2 → 3 → [4→5→6→7→8→9] → 10  → 11  → 12       → 13 → 14
-  NA      Dealer     ←── After Sales ──→  Gudang  Kurir  LOLO Ker  Gudang  DO
-                     Karoseri 0-100% PDI  Masuk          Verif.  Keluar  SELESAI
+State 0 → 1 → 2 → 3 → [4→5→6→7→8→9] → 10  → 11   → 12 → 13
+  NA      Dealer     ←── After Sales ──→  Gudang  KEUR  Gudang  DO
+                     Karoseri 0-100% PDI  Masuk   Uji   Keluar  SELESAI
 ```
 
-> **Catatan Alur:** Setelah State 9 (PDI), unit **wajib** melewati State 10 (Gudang Masuk) → 11 (Kurir) → 12 (LOLO Ker) → 13 (Gudang Keluar) → baru bisa State 14 (DO). Pola **identik dengan CBU**.
+> **Catatan Alur:** Setelah State 9 (PDI), unit **wajib** melewati State 10 (Gudang Masuk) → 11 (KEUR) → 12 (Gudang Keluar) → baru bisa State 13 (DO). Pola **identik dengan CBU**.
 
 | State | Nama | Role | Foto Wajib | Keterangan | Dashboard |
 |-------|------|------|------------|------------|-----------|
@@ -313,10 +310,9 @@ State 0 → 1 → 2 → 3 → [4→5→6→7→8→9] → 10  → 11  → 12    
 | 8 | Karoseri 100% | `karoseri` | ✅ | Finishing & wiring (lampu, sensor parkir) | After Sales |
 | 9 | QC / PDI | `foreman` | ✅ | | After Sales |
 | 10 | Gudang Masuk | `gudang` | ✅ | Konfirmasi unit masuk gudang | Sales |
-| 11 | Kurir | `kurir` | ✅ | Kurir mencatat penerimaan unit di gudang | Sales |
-| 12 | Verifikasi LOLO Ker | `ker` | ✅ | Lolos / Tidak Lolos — wajib sebelum keluar | Sales |
-| 13 | Gudang Keluar | `gudang` | ✅ | Konfirmasi unit keluar gudang | Sales |
-| 14 | DO / Keluar ke Customer (SELESAI) | `ekspedisi`, `driver` | ✅ + Alamat + BAST | Foto BAST + Alamat lengkap | Sales |
+| 11 | KEUR | `keur` | ✅ | Uji sertifikasi kendaraan — **Lolos / Tidak Lolos** | Sales |
+| 12 | Gudang Keluar | `gudang` | ✅ | Konfirmasi unit keluar gudang | Sales |
+| 13 | DO / Keluar ke Customer (SELESAI) | `ekspedisi`, `driver` | ✅ + Alamat + BAST | Foto BAST + Alamat lengkap | Sales |
 
 ### 6.3 Aturan State (Sistem Tongkat Estafet)
 
@@ -325,11 +321,11 @@ State 0 → 1 → 2 → 3 → [4→5→6→7→8→9] → 10  → 11  → 12    
 3. **PDI Fork:**
    - ✅ PDI Good → state lanjut normal
    - ❌ PDI Not Good → wajib buat laporan Trouble, state tidak bisa maju
-4. **State 15 CBU / State 14 CKD (SELESAI)** — Wajib mengisi: Foto BAST + Alamat (Provinsi, Kota, Alamat Lengkap)
-5. **Gudang Wajib 4 Tahap (CBU & CKD)** — Setelah PDI, unit wajib melewati:
-   - State Gudang Masuk (`gudang`) → State Kurir (`kurir`) → State LOLO Ker (`ker`) → State Gudang Keluar (`gudang`)
+4. **State 14 CBU / State 13 CKD (SELESAI)** — Wajib mengisi: Foto BAST + Alamat (Provinsi, Kota, Alamat Lengkap)
+5. **Gudang Wajib 3 Tahap (CBU & CKD)** — Setelah PDI, unit wajib melewati:
+   - State Gudang Masuk (`gudang`) → State KEUR (`keur`) → State Gudang Keluar (`gudang`)
    - Tidak bisa loncat, sequential ketat untuk semua unit.
-6. **LOLO Ker Fork:**
+6. **KEUR Fork:**
    - ✅ Lolos → state lanjut ke Gudang Keluar
    - ❌ Tidak Lolos → wajib buat laporan Trouble, unit dikunci sampai trouble `solved`
 7. **Timestamp Wajib** — Setiap update state **wajib mencatat jam dan tanggal** (format: DD/MM/YYYY HH:mm). Tampil di riwayat unit dan history dashboard.
@@ -355,8 +351,8 @@ State 0 → 1 → 2 → 3 → [4→5→6→7→8→9] → 10  → 11  → 12    
 | Generate Link | Buat link mobile untuk field team |
 
 **Filter State yang tampil:**
-- CBU: State 1, 2, 3, 10, 11, 12, 13, 14, 15
-- CKD: State 1, 2, 3, 10, 11, 12, 13, 14
+- CBU: State 1, 2, 3, 10, 11, 12, 13, 14
+- CKD: State 1, 2, 3, 10, 11, 12, 13
 
 ---
 
@@ -406,7 +402,7 @@ Menangani operasional proses fisik unit di karoseri dan PDI.
 
 **Akses:** Role `as_technical`, `as_head`, dan `coo`
 
-Menangani seluruh **Trouble Handling** dari **semua state 1–15** (CBU) dan **1–14** (CKD).
+Menangani seluruh **Trouble Handling** dari **semua state 1–14** (CBU) dan **1–13** (CKD).
 
 | Komponen | Deskripsi |
 |----------|-----------|
@@ -448,7 +444,7 @@ Menangani seluruh **Trouble Handling** dari **semua state 1–15** (CBU) dan **1
 | Yang Membuat | Role yang Bisa Dibuat |
 |-------------|----------------------|
 | `coo` | `sales`, `as_head` |
-| `sales` | `forwarder`, `gudang`, `kurir`, `ker`, `ekspedisi`, `driver`, PIC `sales` |
+| `sales` | `forwarder`, `gudang`, `keur`, `ekspedisi`, `driver`, PIC `sales` |
 | `as_head` | `as_workshop`, `as_technical`, `karoseri`, `foreman` |
 | `as_workshop` | `karoseri`, `foreman` (generate link saja, tidak buat akun baru) |
 | `as_technical` | ❌ Tidak bisa buat akun |
@@ -553,7 +549,7 @@ Upload .xlsx
 
 ## 10. Modul Trouble Handling
 
-> **Penting:** Seluruh trouble dari **semua state (1–15 CBU / 1–14 CKD)** ditangani oleh **After Sales divisi Technical**. Sales hanya melihat trouble di dashboardnya sebagai informasi, tetapi **tidak berwenang** memberi instruksi atau menyelesaikan trouble.
+> **Penting:** Seluruh trouble dari **semua state (1–14 CBU / 1–13 CKD)** ditangani oleh **After Sales divisi Technical**.
 
 ### 10.1 Alur Status Trouble
 
@@ -581,7 +577,7 @@ Wajib diisi:
 - **Foto Kerusakan** — opsional
 - **Lokasi Trouble** — kota/alamat kejadian
 
-> Trouble bisa dilaporkan dari **state mana saja** (CBU: 1–15 / CKD: 1–14). Khusus **LOLO Ker (State 12)**: jika Tidak Lolos, otomatis membuat trouble dan mengunci unit.
+> Trouble bisa dilaporkan dari **state mana saja** (CBU: 1–14 / CKD: 1–13). Khusus **KEUR (State 11)**: jika Tidak Lolos, otomatis membuat trouble dan mengunci unit.
 
 ### 10.3 Trouble Lock
 
@@ -671,7 +667,7 @@ Belum diimplementasikan di frontend. Akan dibangun di backend Laravel.
 | `unit_type` | ENUM(CBU,CKD) | |
 | `model` | VARCHAR(100) | |
 | `color` | VARCHAR(50) | |
-| `current_state` | TINYINT | 0–15 CBU / 0–14 CKD |
+| `current_state` | TINYINT | 0–14 CBU / 0–13 CKD |
 | `current_location` | VARCHAR(100) | |
 | `progress_percent` | TINYINT | 0, 25, 50, 75, 100 (milestone karoseri) |
 | `status` | ENUM(active, completed, trouble) | |
