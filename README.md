@@ -335,6 +335,10 @@ St 0 → 1    → 2     → 3    → 4  → 5    → [6→7→8→9→10→11] �
    - ✅ Lolos → state lanjut ke Gudang Keluar
    - ❌ Tidak Lolos → wajib buat laporan Trouble, unit dikunci sampai trouble `solved`
 7. **Timestamp Wajib** — Setiap update state **wajib mencatat jam dan tanggal** (format: DD/MM/YYYY HH:mm). Tampil di riwayat unit dan history dashboard.
+8. **Anti-Double State Update** — Sistem mencegah double submit state:
+   - **Backend:** Sebelum menerima update, validasi `current_state` unit di database. Jika state yang dikirim bukan `current_state + 1`, request **ditolak** dengan pesan error.
+   - **Frontend:** Setelah berhasil submit, tombol update langsung **di-disable** dan tampil status *"✅ Sudah diupdate"*. Tombol tidak muncul lagi kecuali ada state baru yang perlu diisi.
+   - **Idempotency:** Setiap request update state membawa `expected_state` (state yang diharapkan), backend menolak jika `current_state` unit berbeda.
 
 ---
 
@@ -592,6 +596,41 @@ Jika unit punya trouble berstatus `open` atau `waiting_ho`:
 - Banner merah muncul: *"🔒 Update Dikunci — Trouble Aktif"*
 - Unit tidak bisa maju ke state berikutnya sampai trouble `solved`
 
+### 10.4 Anti-Double Input Trouble
+
+Sistem mencegah double input trouble untuk VIN yang sama oleh role yang sama.
+
+#### Alur saat Field Team input VIN di halaman Trouble:
+
+```
+Input VIN
+    │
+    ▼
+ Apakah unit punya trouble AKTIF (open/waiting_ho)?
+    │
+    ├── YA, dari role yang SAMA
+    │       └→ Tampilkan trouble existing dalam mode UPDATE
+    │           Banner: "⚠️ Kamu sudah melaporkan trouble ini pada [tgl jam].
+    │                    Klik untuk update laporan."
+    │           Tombol: [Update Laporan] — bukan form baru
+    │
+    └── TIDAK (tidak ada trouble aktif, atau sebelumnya sudah SOLVED)
+            └→ Tampilkan form trouble baru (CREATE)
+```
+
+#### Aturan:
+1. **1 unit = maks 1 trouble aktif** pada satu waktu (status `open` atau `waiting_ho`)
+2. **Trouble berbeda di state berbeda diperbolehkan** — trouble forwarder yang sudah `solved`, lalu di karoseri ada trouble baru → ini trouble terpisah dan boleh dibuat
+3. **Semua trouble tersimpan sebagai riwayat** — tidak ada yang dihapus atau ditimpa
+4. **Backend validation:** Sebelum `INSERT` trouble baru, cek apakah ada trouble dengan `unit_id` yang sama dan status `open` atau `waiting_ho`. Jika ada, return `409 Conflict`.
+5. **Frontend:** Saat field team scan/input VIN di halaman trouble, sistem langsung cek status trouble aktif dan tampilkan UI yang sesuai (CREATE atau UPDATE mode)
+
+### 10.5 Riwayat Trouble
+
+- Semua trouble (termasuk yang sudah `solved`) tersimpan permanen
+- Bisa dilihat di **Detail Unit** pada dashboard
+- Diurutkan dari yang terbaru
+- Riwayat trouble tidak bisa diedit atau dihapus oleh siapapun
 
 ---
 
@@ -640,6 +679,53 @@ Sebelum export, user dapat memfilter data berdasarkan:
 - Foto yang gagal diambil akan diganti placeholder teks: `[Foto tidak tersedia]`
 
 > **Kenapa Excel bukan CSV?** CSV tidak mendukung gambar. Excel (.xlsx) mendukung embed gambar sehingga laporan bisa langsung diprint atau difilter tanpa kehilangan visual.
+
+---
+
+## 12. Export Excel Trouble
+
+### 12.1 Deskripsi
+
+Fitur export khusus **dashboard Trouble** (as_technical, as_head, COO) untuk menghasilkan file **Excel (.xlsx)** berisi riwayat trouble lengkap dengan foto.
+
+### 12.2 Filter Export Trouble
+
+| Filter | Opsi |
+|--------|------|
+| **Tanggal** | Range tanggal lapor trouble |
+| **Status** | `open` / `waiting_ho` / `solved` / Semua |
+| **Tipe Trouble** | `driver` / `karoseri` / `gudang` / `transit` / Semua |
+| **Tipe Unit** | CBU / CKD / Semua |
+| **Karoseri** | Vendor karoseri atau Semua |
+
+> Tombol **"Export Excel"** hanya aktif setelah minimal 1 filter dipilih.
+
+### 12.3 Kolom di File Excel Trouble
+
+| Kolom | Keterangan |
+|-------|------------|
+| VIN | Nomor identifikasi kendaraan |
+| Model | Model unit |
+| Tipe Unit | CBU / CKD |
+| State Saat Trouble | Nama state saat trouble dilaporkan |
+| Tipe Trouble | driver / karoseri / gudang / transit |
+| Rute | Dari mana ke mana |
+| Kronologi | Deskripsi kejadian |
+| Lokasi | Kota/alamat kejadian |
+| Foto Kerusakan | Gambar (embed, jika ada) |
+| Status | open / waiting\_ho / solved |
+| Instruksi HO | Isi `ho_response` dari After Sales Technical |
+| Solusi | Isi `solution` saat trouble diselesaikan |
+| Dilaporkan Oleh | Nama + Role pelapor |
+| Tgl Lapor | Tanggal & jam trouble dilaporkan |
+| Tgl Solved | Tanggal & jam trouble diselesaikan |
+
+### 12.4 Format File
+
+- Format: **Excel (.xlsx)**
+- Foto embed di baris yang sesuai (jika ada)
+- Nama file otomatis: `Trouble_Export_[TglAwal]_[TglAkhir].xlsx`
+- Foto tidak tersedia → teks `[Foto tidak tersedia]`
 
 ---
 
@@ -719,10 +805,13 @@ Belum diimplementasikan di frontend. Akan dibangun di backend Laravel.
 
 ## 13. Real-Time & Auto Refresh
 
-- Dashboard polling **setiap 5 detik** via React Query `refetchInterval: 5000`
-- Tombol **Manual Refresh** dengan timestamp terakhir refresh
-- Saat field team update state → dashboard Sales/After Sales/COO otomatis memperbarui
+- Dashboard polling **setiap 60 detik** via React Query `refetchInterval: 60000`
+- Tombol **Manual Refresh** wajib ada dengan timestamp terakhir refresh
+- Polling **hanya aktif di halaman dashboard** — tidak di halaman lain
+- Saat field team update state → user bisa klik Manual Refresh atau tunggu 60 detik
 - Siap upgrade ke **Laravel Reverb (WebSocket)** tanpa perubahan arsitektur besar
+
+> **Kenapa 60 detik?** 30 user polling tiap 5 detik = 360 request/menit hanya dari dashboard. Dengan 60 detik = 30 request/menit. Jauh lebih hemat resource server.
 
 ---
 
@@ -733,6 +822,135 @@ Belum diimplementasikan di frontend. Akan dibangun di backend Laravel.
 | Auth | `base44.entities.AccessCode.list()` | Session + Middleware Laravel |
 | CRUD | `base44.entities.X.list/create/update/delete` | Eloquent + Controller |
 | File Upload | `base44.integrations.Core.UploadFile()` | Laravel Storage (local/S3) |
-| Real-time | `base44.entities.X.subscribe()` | Polling / Laravel Reverb |
+| Real-time | `base44.entities.X.subscribe()` | Polling 60 detik + Manual Refresh |
 | Routing | React SPA + BrowserRouter | Inertia.js + Laravel Router |
 | UUID | Auto dari Base44 | `Str::uuid()` Laravel + DB UUID PK |
+
+---
+
+## 15. Technical Constraints (Server Optimization)
+
+Sistem dirancang untuk berjalan pada **shared hosting maupun VPS** dengan resource terbatas. Seluruh implementasi wajib memperhatikan efisiensi berikut:
+
+### 15.1 Polling & Request
+
+| Aturan | Implementasi |
+|--------|--------------|
+| Polling 60 detik | `refetchInterval: 60000` di React Query |
+| Polling hanya di dashboard | Matikan polling di halaman non-dashboard |
+| Tombol Manual Refresh | Wajib ada di semua dashboard |
+
+### 15.2 Upload File
+
+| Aturan | Implementasi |
+|--------|--------------|
+| Batas ukuran | Max **5 MB** per foto, validasi di frontend + backend |
+| Auto compress | Resize & compress via PHP GD / Intervention Image sebelum disimpan |
+| Nama file | Random: `Str::random(16) . '_' . time() . '.jpg'` — tidak boleh nama asli |
+| Validasi tipe | Hanya `jpg`, `jpeg`, `png`, `webp` — validasi MIME type, bukan hanya ekstensi |
+| Struktur folder | `/storage/app/public/photos/{vin}/{state}/` |
+
+### 15.3 Database & Query
+
+| Aturan | Implementasi |
+|--------|--------------|
+| Pagination | Max **20 unit per halaman** di semua tabel dashboard |
+| Index wajib | Kolom `vin`, `current_state`, `status`, `unit_type` harus di-index |
+| Eager loading | Gunakan `with()` untuk relasi — hindari N+1 query |
+| Select spesifik | Hindari `SELECT *` — ambil kolom yang dibutuhkan saja |
+
+### 15.4 Import Excel
+
+| Aturan | Implementasi |
+|--------|--------------|
+| Batas baris | Max **200 baris** per file upload |
+| Proses batch | Gunakan chunk/batch agar tidak timeout |
+| Validasi dulu | Validasi semua baris sebelum insert — rollback jika ada error |
+| Feedback | Tampilkan ringkasan: X berhasil, Y gagal + pesan error per baris |
+
+### 15.5 Keamanan Mobile Link
+
+| Aturan | Implementasi |
+|--------|--------------|
+| Panjang kode | Minimum **32 karakter** via `Str::random(32)` |
+| Simpan di DB | Hash kode dengan `bcrypt` — tidak simpan plain text |
+| Nonaktifkan | Toggle `is_active` per akun — link langsung tidak bisa dipakai |
+| Format URL | `https://domain/m?code=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` |
+
+### 15.6 State Validation — Backend Wajib
+
+> ⚠️ Kontrol hanya di frontend **tidak cukup** — request bisa dimanipulasi manual.
+
+- **Middleware Laravel** validasi role dan state expected sebelum setiap update
+- **Backend reject** jika state yang dikirim bukan `current_state + 1` → response `403 Forbidden`
+- **API tidak bisa dipanggil** untuk loncat state (validasi di level controller/middleware)
+- **God Mode COO** hanya via endpoint khusus yang dilindungi Policy Laravel
+
+### 15.7 COO Role Security
+
+- Semua route COO dilindungi `RoleMiddleware` + `CooPolicy`
+- Double-check: **middleware level** (route) + **policy level** (action)
+- Setiap action God Mode dicatat di tabel `audit_logs`
+
+---
+
+## 16. Panduan Deployment
+
+### 16.1 Persiapan Sebelum Upload
+
+```bash
+# 1. Build frontend (wajib dilakukan di lokal sebelum upload)
+npm run build
+# → Hasilkan folder public/build/
+
+# 2. Pastikan .env sudah diisi untuk production
+#    APP_DEBUG=false, APP_ENV=production, DB_*, APP_URL
+```
+
+### 16.2 Folder yang Di-Upload ke Server
+
+| Folder/File | Upload? | Keterangan |
+|-------------|---------|------------|
+| `app/` | ✅ | Logic utama |
+| `bootstrap/` | ✅ | Bootstrap Laravel |
+| `config/` | ✅ | Konfigurasi |
+| `database/` | ✅ | Migration & seeder |
+| `public/` | ✅ | **Web root/document root** |
+| `public/build/` | ✅ | Hasil `npm run build` |
+| `resources/` | ✅ | Views & assets source |
+| `routes/` | ✅ | Definisi routes |
+| `storage/` | ✅ | Folder kosong tetap perlu |
+| `vendor/` | ✅ | Atau `composer install` di server |
+| `.env` | ✅ | Isi konfigurasi production |
+| `artisan` | ✅ | CLI Laravel |
+| `composer.json` | ✅ | Dependencies list |
+| `node_modules/` | ❌ | **JANGAN upload** — terlalu besar |
+| `.git/` | ❌ | **JANGAN upload** |
+| `package.json` | ❌ | Tidak dibutuhkan di server |
+
+### 16.3 Langkah di Server Setelah Upload
+
+```bash
+# 1. Install dependencies PHP (jika vendor/ tidak diupload)
+composer install --no-dev --optimize-autoloader
+
+# 2. Generate app key (jika .env belum punya APP_KEY)
+php artisan key:generate
+
+# 3. Jalankan migrasi database
+php artisan migrate --force
+
+# 4. Set permission storage
+chmod -R 775 storage bootstrap/cache
+
+# 5. Cache konfigurasi untuk performa
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+### 16.4 Konfigurasi Web Server
+
+- **Document root** harus diarahkan ke folder `public/` — bukan root project
+- Pastikan `.htaccess` di `public/` aktif (untuk Apache) atau konfigurasi Nginx sesuai
+- URL rewriting harus aktif (`mod_rewrite` Apache / `try_files` Nginx)
